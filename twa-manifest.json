@@ -1,0 +1,27 @@
+{
+  "host": "www.golapishop.online",
+  "name": "Golapi Zone Manager",
+  "short_name": "Zone Manager",
+  "theme_color": "#7B1FA2",
+  "navigation_color": "#7B1FA2",
+  "navigation_color_dark": "#4A148C",
+  "navigation_divider_color": "#7B1FA2",
+  "navigation_divider_color_dark": "#4A148C",
+  "background_color": "#F3E5F5",
+  "start_url": "/#zone-manager",
+  "icon_url": "https://raw.githubusercontent.com/minna112-del/create-ai-video/main/logo.jpeg",
+  "maskable_icon_url": "https://raw.githubusercontent.com/minna112-del/create-ai-video/main/logo.jpeg",
+  "splash_screen_fade_out_duration": 300,
+  "enable_notifications": true,
+  "shortcuts": [],
+  "packageId": "online.golapishop.zonemanager",
+  "signing_key": {
+    "path": "golapi-zm.keystore",
+    "alias": "golapi-zm"
+  },
+  "app_version_name": "1.0.0",
+  "app_version_code": 1,
+  "display": "standalone",
+  "orientation": "portrait",
+  "fallback_type": "customtabs"
+}
