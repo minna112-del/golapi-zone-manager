@@ -11,72 +11,56 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install SDK components
+      - name: Download Gradle
         run: |
-          sdkmanager "build-tools;34.0.0" "platforms;android-34"
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.5-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          mv gradle-8.5 gradle
+          chmod +x gradle/bin/gradle
 
-      - name: Generate signing keystore
+      - name: Build APK
         run: |
-          keytool -genkeypair -v \
-            -keystore release.keystore \
-            -alias golapi \
+          set -e
+
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
+
+          keytool -genkeypair -v -keystore release.keystore -alias golapi-zm \
             -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android123 -keypass android123 \
-            -dname "CN=Golapi Zone Manager,OU=Dev,O=MT Studio,L=Noakhali,ST=Chittagong,C=BD"
+            -storepass pass1234 -keypass pass1234 \
+            -dname "CN=Golapi Zone Manager,O=MT Studio,L=Noakhali,C=BD" 2>/dev/null || true
 
-      - name: Create TWA Android project
-        run: |
-          mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/drawable
-          mkdir -p app/src/main/java/online.golapishop.zonemanager
-          mkdir -p gradle/wrapper
+          mkdir -p app/src/main/res/values app/src/main/res/mipmap-hdpi
 
-          # Download Gradle wrapper
-          curl -sL "https://services.gradle.org/distributions/gradle-8.7-bin.zip" -o gradle/wrapper/gradle-8.7-bin.zip
-          cat > gradle/wrapper/gradle-wrapper.properties << 'GWEOF'
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          GWEOF
+          cat > settings.gradle << 'S'
+          rootProject.name = 'GolapiZoneManager'
+          include ':app'
+          S
 
-          # settings.gradle
-          echo 'rootProject.name = "GalapiShop"' > settings.gradle
-
-          # Top-level build.gradle
-          cat > build.gradle << 'BGEOF'
+          cat > build.gradle << 'B'
           buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.3.2'
-              }
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
           }
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          BGEOF
+          allprojects { repositories { google(); mavenCentral() } }
+          B
 
-          # app/build.gradle
-          cat > app/build.gradle << 'ABEOF'
-          plugins {
-              id 'com.android.application'
-          }
+          cat > gradle.properties << 'G'
+          android.useAndroidX=true
+          org.gradle.jvmargs=-Xmx2048m
+          G
+
+          cat > app/build.gradle << 'A'
+          apply plugin: 'com.android.application'
           android {
               namespace 'online.golapishop.zonemanager'
               compileSdk 34
@@ -86,35 +70,19 @@ jobs:
                   targetSdk 34
                   versionCode 1
                   versionName "1.0.0"
-
-                  manifestPlaceholders = [
-                    hostName: "www.golapishop.online",
-                    defaultUrl: "https://www.golapishop.online/#zone-manager",
-                    launcherName: "Golapi Zone Manager",
-                    assetStatements: '[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"https://www.golapishop.online"}}]',
-                    themeColor: "#7B1FA2",
-                    navigationColor: "#7B1FA2",
-                    navigationColorDark: "#4A148C",
-                    navigationDividerColor: "#7B1FA2",
-                    navigationDividerColorDark: "#4A148C",
-                    backgroundColor: "#F3E5F5",
-                    enableNotifications: "true",
-                    splashScreenFadeOutDuration: "300"
-                  ]
               }
               signingConfigs {
                   release {
-                      storeFile file("../../release.keystore")
-                      storePassword "android123"
-                      keyAlias "golapi"
-                      keyPassword "android123"
+                      storeFile file("../release.keystore")
+                      storePassword "pass1234"
+                      keyAlias "golapi-zm"
+                      keyPassword "pass1234"
                   }
               }
               buildTypes {
                   release {
                       signingConfig signingConfigs.release
-                      minifyEnabled true
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+                      minifyEnabled false
                   }
               }
               compileOptions {
@@ -123,125 +91,53 @@ jobs:
               }
           }
           dependencies {
+              implementation 'androidx.browser:browser:1.8.0'
               implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
           }
-          ABEOF
+          A
 
-          # AndroidManifest.xml
-          cat > app/src/main/AndroidManifest.xml << 'AMEOF'
+          cat > app/src/main/AndroidManifest.xml << 'M'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-              <application
-                  android:label="${launcherName}"
-                  android:icon="@drawable/ic_launcher"
-                  android:allowBackup="true"
-                  android:supportsRtl="true"
-                  android:theme="@style/AppTheme">
-
-                  <meta-data
-                      android:name="asset_statements"
-                      android:value='${assetStatements}' />
-
-                  <activity
-                      android:name="android.support.customtabs.trusted.LauncherActivity"
-                      android:exported="true"
-                      android:theme="@style/LaunchTheme">
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                          android:value="${defaultUrl}" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
-                          android:value="${themeColor}" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
-                          android:value="${navigationColor}" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
-                          android:value="${backgroundColor}" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
-                          android:value="${splashScreenFadeOutDuration}" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.SCREEN_ORIENTATION"
-                          android:value="portrait" />
-
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-
-                      <intent-filter android:autoVerify="true">
-                          <action android:name="android.intent.action.VIEW" />
-                          <category android:name="android.intent.category.DEFAULT" />
-                          <category android:name="android.intent.category.BROWSABLE" />
-                          <data android:scheme="https" android:host="${hostName}" />
-                      </intent-filter>
-                  </activity>
-              </application>
+            <application android:label="Golapi Zone Manager" android:icon="@mipmap/ic_launcher" android:allowBackup="true" android:theme="@style/AppTheme">
+              <meta-data android:name="asset_statements" android:value='[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"https://www.golapishop.online"}}]'/>
+              <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
+                <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://www.golapishop.online/#zone-manager"/>
+                <meta-data android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR" android:value="#7B1FA2"/>
+                <meta-data android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR" android:value="#7B1FA2"/>
+                <meta-data android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR" android:value="#F3E5F5"/>
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+                <intent-filter android:autoVerify="true">
+                  <action android:name="android.intent.action.VIEW"/>
+                  <category android:name="android.intent.category.DEFAULT"/>
+                  <category android:name="android.intent.category.BROWSABLE"/>
+                  <data android:scheme="https" android:host="www.golapishop.online"/>
+                </intent-filter>
+              </activity>
+            </application>
           </manifest>
-          AMEOF
+          M
 
-          # styles.xml
-          cat > app/src/main/res/values/styles.xml << 'SEOF'
+          cat > app/src/main/res/values/styles.xml << 'T'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
-                  <item name="android:windowBackground">#F3E5F5</item>
-                  <item name="colorPrimary">#7B1FA2</item>
-                  <item name="colorPrimaryDark">#4A148C</item>
-              </style>
-              <style name="LaunchTheme" parent="AppTheme">
-                  <item name="android:windowBackground">#F3E5F5</item>
-              </style>
+            <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
+              <item name="android:windowBackground">#F3E5F5</item>
+            </style>
           </resources>
-          SEOF
+          T
 
-          # strings.xml
-          cat > app/src/main/res/values/strings.xml << 'STREOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">Golapi Zone Manager</string>
-          </resources>
-          STREOF
+          printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n\x2d\xb4\x00\x00\x00\x00IEND\xaeB`\x82' > app/src/main/res/mipmap-hdpi/ic_launcher.png
 
-          # Download logo as launcher icon
-          curl -sL "https://raw.githubusercontent.com/minna112-del/golapishop.online/main/logo.jpeg" -o logo_temp.jpeg
-          # Convert to PNG for Android (use ImageMagick if available, otherwise use as-is)
-          cp logo_temp.jpeg app/src/main/res/drawable/ic_launcher.jpeg
-          # Create a simple XML drawable that references it
-          cat > app/src/main/res/drawable/ic_launcher.xml << 'ICEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-              <background android:drawable="@color/ic_launcher_background"/>
-              <foreground android:drawable="@color/ic_launcher_background"/>
-          </adaptive-icon>
-          ICEOF
-          cat > app/src/main/res/values/colors.xml << 'CEOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <color name="ic_launcher_background">#7B1FA2</color>
-          </resources>
-          CEOF
-
-      - name: Build APK with Gradle
-        run: |
-          chmod +x gradlew 2>/dev/null || true
-          # Use gradle directly since we don't have gradlew
-          gradle wrapper --gradle-version 8.7 || true
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          ./gradle/bin/gradle assembleRelease --no-daemon --stacktrace
+        shell: bash
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Golapi-Zone-Manager
-          path: app/build/outputs/apk/release/*.apk
+          name: Golapi-Zone-Manager-APK
+          path: app/build/outputs/apk/release/app-release.apk
