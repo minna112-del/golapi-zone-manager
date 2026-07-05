@@ -1,0 +1,42 @@
+name: Build Zone Manager APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bubblewrap
+        run: npm i -g @nicolo-ribaudo/customizable-bubblewrap
+
+      - name: Initialize TWA Project
+        run: |
+          mkdir -p /home/runner/.aspect_ratio_tolerance
+          bubblewrap init --manifest="twa-manifest.json" --directory="twa-build"
+
+      - name: Build APK
+        working-directory: twa-build
+        run: |
+          bubblewrap build --skipPwaValidation
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: golapi-zone-manager
+          path: twa-build/app-release-unsigned.apk
