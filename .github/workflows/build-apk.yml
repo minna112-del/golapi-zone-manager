@@ -1,6 +1,8 @@
-name: Build Zone Manager APK
+name: Build Golapi Zone Manager APK
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -8,106 +10,93 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Build APK
+      - uses: android-actions/setup-android@v3
+      - name: Accept Licenses
+        run: yes | sdkmanager --licenses || true
+      - name: Decode Keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/release.keystore
+      - name: Build TWA Project
         run: |
-          set -e
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
+          mkdir -p app/app/src/main/res/mipmap-mdpi app/app/src/main/res/mipmap-hdpi
+          mkdir -p app/app/src/main/res/mipmap-xhdpi app/app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/app/src/main/res/values
 
-          keytool -genkeypair -v -keystore release.keystore -alias app \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass pass1234 -keypass pass1234 \
-            -dname "CN=Golapi,O=MTStudio,L=Noakhali,C=BD"
+          python3 -c "
+          import struct,zlib
+          def png(w,h,r,g,b):
+            def c(n,d): crc=zlib.crc32(n+d)&0xffffffff; return struct.pack('>I',len(d))+n+d+struct.pack('>I',crc)
+            raw=b''.join(b'\x00'+bytes([r,g,b]*w) for _ in range(h))
+            return b'\x89PNG\r\n\x1a\n'+c(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0))+c(b'IDAT',zlib.compress(raw))+c(b'IEND',b'')
+          for p,s in [('app/app/src/main/res/mipmap-mdpi/ic_launcher.png',48),('app/app/src/main/res/mipmap-hdpi/ic_launcher.png',72),('app/app/src/main/res/mipmap-xhdpi/ic_launcher.png',96),('app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png',144)]:
+            open(p,'wb').write(png(s,s,123,31,162))
+          print('Icons done')
+          "
 
-          mkdir -p app/src/main/res/values app/src/main/res/mipmap-hdpi app/src/main/res/mipmap-xhdpi app/src/main/res/mipmap-xxhdpi
-
-          cat > settings.gradle << 'S'
-          rootProject.name = 'GolapiZM'
+          cat > app/settings.gradle << 'EOF'
+          rootProject.name = "GolApiZone"
           include ':app'
-          S
+          EOF
 
-          cat > build.gradle << 'B'
+          cat > app/build.gradle << 'EOF'
           buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
+            repositories { google(); mavenCentral() }
+            dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
           }
           allprojects { repositories { google(); mavenCentral() } }
-          B
+          EOF
 
-          echo 'android.useAndroidX=true
-          org.gradle.jvmargs=-Xmx2048m' > gradle.properties
+          cat > app/gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m
+          EOF
 
-          cat > app/build.gradle << 'A'
-          apply plugin: 'com.android.application'
-          android {
-              namespace 'online.golapishop.zonemanager'
-              compileSdk 34
-              defaultConfig {
-                  applicationId "online.golapishop.zonemanager"
-                  minSdk 24
-                  targetSdk 34
-                  versionCode 1
-                  versionName "1.0.0"
-              }
-              signingConfigs {
-                  release {
-                      storeFile file("../release.keystore")
-                      storePassword "pass1234"
-                      keyAlias "app"
-                      keyPassword "pass1234"
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                      minifyEnabled false
-                  }
-              }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-          }
+          cat > app/app/build.gradle << 'EOF'
+          plugins { id 'com.android.application' }
           configurations.all {
-              resolutionStrategy {
-                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+            exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+            exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+            resolutionStrategy.eachDependency { d ->
+              if(d.requested.group == 'org.jetbrains.kotlin') d.useVersion '1.9.24'
+            }
+          }
+          android {
+            namespace 'online.golapishop.zone'
+            compileSdk 34
+            defaultConfig {
+              applicationId 'online.golapishop.zone'
+              minSdk 19; targetSdk 34
+              versionCode 1; versionName '1.0'
+            }
+            signingConfigs {
+              release {
+                storeFile file('/tmp/release.keystore')
+                storePassword System.getenv('KEY_STORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEY_PASSWORD')
               }
+            }
+            buildTypes {
+              release { minifyEnabled false; signingConfig signingConfigs.release }
+            }
+            packagingOptions { exclude 'META-INF/versions/9/previous-compilation-data.bin' }
           }
           dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'androidx.browser:browser:1.7.0'
-              implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+            implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+            implementation 'androidx.appcompat:appcompat:1.7.0'
           }
-          A
+          EOF
 
-          cat > app/src/main/AndroidManifest.xml << 'M'
+          cat > app/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <application android:label="Golapi Zone Manager" android:icon="@mipmap/ic_launcher"
-              android:allowBackup="true" android:theme="@style/AppTheme">
-              <meta-data android:name="asset_statements"
-                android:value='[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"https://www.golapishop.online"}}]'/>
-              <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
-                android:exported="true">
-                <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                  android:value="https://www.golapishop.online/#zone-manager"/>
-                <meta-data android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
-                  android:value="#7B1FA2"/>
-                <meta-data android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
-                  android:value="#7B1FA2"/>
-                <meta-data android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
-                  android:value="#F3E5F5"/>
+            <application android:label="Golapi Zone Manager" android:icon="@mipmap/ic_launcher" android:theme="@style/AppTheme" android:allowBackup="true">
+              <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
+                <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://www.golapishop.online/?role=zone-manager" />
                 <intent-filter>
                   <action android:name="android.intent.action.MAIN"/>
                   <category android:name="android.intent.category.LAUNCHER"/>
@@ -121,35 +110,35 @@ jobs:
               </activity>
             </application>
           </manifest>
-          M
+          EOF
 
-          cat > app/src/main/res/values/styles.xml << 'T'
+          cat > app/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
             <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-              <item name="android:windowBackground">#F3E5F5</item>
               <item name="colorPrimary">#7B1FA2</item>
-              <item name="colorPrimaryDark">#4A148C</item>
             </style>
           </resources>
-          T
+          EOF
 
-          python3 -c "
-          import struct, zlib
-          def png(w,h,r,g,b):
-              raw = b''
-              for y in range(h): raw += b'\x00' + bytes([r,g,b]) * w
-              d = zlib.compress(raw)
-              def chunk(t,data): return struct.pack('>I',len(data)) + t + data + struct.pack('>I',zlib.crc32(t+data)&0xffffffff)
-              return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0)) + chunk(b'IDAT',d) + chunk(b'IEND',b'')
-          for d,s in [('mipmap-hdpi',72),('mipmap-xhdpi',96),('mipmap-xxhdpi',144)]:
-              open(f'app/src/main/res/{d}/ic_launcher.png','wb').write(png(s,s,123,31,162))
-          "
-
-          gradle wrapper --gradle-version 8.5 && chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
-
+      - name: Setup Gradle Wrapper
+        run: cd app && gradle wrapper --gradle-version 8.4
+      - name: Build APK
+        env:
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: cd app && chmod +x gradlew && ./gradlew assembleRelease --stacktrace
+      - name: Collect APK
+        run: cp $(find app -name "*.apk" | head -1) golapi-zone-manager.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Golapi-Zone-Manager-APK
-          path: app/build/outputs/apk/release/*.apk
+          name: golapi-zone-manager-v${{ github.run_number }}
+          path: golapi-zone-manager.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: zone-v${{ github.run_number }}
+          name: "Golapi Zone Manager v${{ github.run_number }}"
+          files: golapi-zone-manager.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
