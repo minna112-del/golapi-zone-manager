@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
       - uses: android-actions/setup-android@v3
@@ -23,118 +23,27 @@ jobs:
       - name: Accept Licenses
         run: yes | sdkmanager --licenses || true
 
+      - name: Install Android SDK 34
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.4'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Install Pillow
-        run: pip install Pillow --break-system-packages -q
+        run: pip install Pillow -q
 
       - name: Decode Keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/release.keystore
 
       - name: Build TWA Project
-        run: |
-          mkdir -p app/app/src/main/res/mipmap-mdpi
-          mkdir -p app/app/src/main/res/mipmap-hdpi
-          mkdir -p app/app/src/main/res/mipmap-xhdpi
-          mkdir -p app/app/src/main/res/mipmap-xxhdpi
-          mkdir -p app/app/src/main/res/mipmap-xxxhdpi
-          mkdir -p app/app/src/main/res/values
+        run: echo "CmltcG9ydCBvcwpmcm9tIFBJTCBpbXBvcnQgSW1hZ2UKCm9zLm1ha2VkaXJzKCdhcHAvYXBwL3NyYy9tYWluL3Jlcy92YWx1ZXMnLCBleGlzdF9vaz1UcnVlKQpmb3IgZG4gaW4gWydtZHBpJywnaGRwaScsJ3hoZHBpJywneHhoZHBpJywneHh4aGRwaSddOgogICAgb3MubWFrZWRpcnMoZidhcHAvYXBwL3NyYy9tYWluL3Jlcy9taXBtYXAte2RufScsIGV4aXN0X29rPVRydWUpCgpzcmMgPSBJbWFnZS5vcGVuKCcuZ2l0aHViL2ljb25zL2ljX2xhdW5jaGVyLnBuZycpLmNvbnZlcnQoJ1JHQkEnKQpmb3Igc3osZG4gaW4gWyg0OCwnbWRwaScpLCg3MiwnaGRwaScpLCg5NiwneGhkcGknKSwoMTQ0LCd4eGhkcGknKSwoMTkyLCd4eHhoZHBpJyldOgogICAgc3JjLnJlc2l6ZSgoc3osc3opLEltYWdlLkxBTkNaT1MpLnNhdmUoZidhcHAvYXBwL3NyYy9tYWluL3Jlcy9taXBtYXAte2RufS9pY19sYXVuY2hlci5wbmcnKQoKb3BlbignYXBwL3NldHRpbmdzLmdyYWRsZScsJ3cnKS53cml0ZSgncm9vdFByb2plY3QubmFtZSA9ICJHb2xBcGlab25lIlxuaW5jbHVkZSAiOmFwcCJcbicpCm9wZW4oJ2FwcC9idWlsZC5ncmFkbGUnLCd3Jykud3JpdGUoJ2J1aWxkc2NyaXB0IHtcbiAgcmVwb3NpdG9yaWVzIHsgZ29vZ2xlKCk7IG1hdmVuQ2VudHJhbCgpIH1cbiAgZGVwZW5kZW5jaWVzIHsgY2xhc3NwYXRoICJjb20uYW5kcm9pZC50b29scy5idWlsZDpncmFkbGU6OC4yLjIiIH1cbn1cbmFsbHByb2plY3RzIHsgcmVwb3NpdG9yaWVzIHsgZ29vZ2xlKCk7IG1hdmVuQ2VudHJhbCgpIH0gfVxuJykKb3BlbignYXBwL2dyYWRsZS5wcm9wZXJ0aWVzJywndycpLndyaXRlKCdhbmRyb2lkLnVzZUFuZHJvaWRYPXRydWVcbmFuZHJvaWQuZW5hYmxlSmV0aWZpZXI9dHJ1ZVxub3JnLmdyYWRsZS5qdm1hcmdzPS1YbXgyMDQ4bVxuJykKb3BlbignYXBwL2FwcC9idWlsZC5ncmFkbGUnLCd3Jykud3JpdGUoJ3BsdWdpbnMgeyBpZCAiY29tLmFuZHJvaWQuYXBwbGljYXRpb24iIH1cbmNvbmZpZ3VyYXRpb25zLmFsbCB7XG4gIGV4Y2x1ZGUgZ3JvdXA6ICJvcmcuamV0YnJhaW5zLmtvdGxpbiIsIG1vZHVsZTogImtvdGxpbi1zdGRsaWItamRrNyJcbiAgZXhjbHVkZSBncm91cDogIm9yZy5qZXRicmFpbnMua290bGluIiwgbW9kdWxlOiAia290bGluLXN0ZGxpYi1qZGs4IlxuICByZXNvbHV0aW9uU3RyYXRlZ3kuZWFjaERlcGVuZGVuY3kgeyBkIC0+XG4gICAgaWYgKGQucmVxdWVzdGVkLmdyb3VwID09ICJvcmcuamV0YnJhaW5zLmtvdGxpbiIpIGQudXNlVmVyc2lvbiAiMS45LjI0IlxuICB9XG59XG5hbmRyb2lkIHtcbiAgbmFtZXNwYWNlICJvbmxpbmUuZ29sYXBpc2hvcC56b25lIlxuICBjb21waWxlU2RrIDM0XG4gIGRlZmF1bHRDb25maWcge1xuICAgIGFwcGxpY2F0aW9uSWQgIm9ubGluZS5nb2xhcGlzaG9wLnpvbmUiXG4gICAgbWluU2RrIDIxXG4gICAgdGFyZ2V0U2RrIDM0XG4gICAgdmVyc2lvbkNvZGUgKFN5c3RlbS5nZXRlbnYoIkdJVEhVQl9SVU5fTlVNQkVSIik/LnRvSW50ZWdlcigpID86IDEpXG4gICAgdmVyc2lvbk5hbWUgIjEuIiArIChTeXN0ZW0uZ2V0ZW52KCJHSVRIVUJfUlVOX05VTUJFUiIpID86ICIwIilcbiAgfVxuICBzaWduaW5nQ29uZmlncyB7XG4gICAgcmVsZWFzZSB7XG4gICAgICBzdG9yZUZpbGUgZmlsZSgiL3RtcC9yZWxlYXNlLmtleXN0b3JlIilcbiAgICAgIHN0b3JlUGFzc3dvcmQgU3lzdGVtLmdldGVudigiS0VZX1NUT1JFX1BBU1NXT1JEIik/LnRyaW0oKVxuICAgICAga2V5QWxpYXMgU3lzdGVtLmdldGVudigiS0VZX0FMSUFTIik/LnRyaW0oKVxuICAgICAga2V5UGFzc3dvcmQgU3lzdGVtLmdldGVudigiS0VZX1BBU1NXT1JEIik/LnRyaW0oKVxuICAgIH1cbiAgfVxuICBidWlsZFR5cGVzIHtcbiAgICByZWxlYXNlIHsgbWluaWZ5RW5hYmxlZCBmYWxzZTsgc2lnbmluZ0NvbmZpZyBzaWduaW5nQ29uZmlncy5yZWxlYXNlIH1cbiAgfVxuICBwYWNrYWdpbmcgeyBleGNsdWRlcyArPSBbIk1FVEEtSU5GL3ZlcnNpb25zLzkvcHJldmlvdXMtY29tcGlsYXRpb24tZGF0YS5iaW4iXSB9XG59XG5kZXBlbmRlbmNpZXMge1xuICBpbXBsZW1lbnRhdGlvbiAiY29tLmdvb2dsZS5hbmRyb2lkYnJvd3NlcmhlbHBlcjphbmRyb2lkYnJvd3NlcmhlbHBlcjoyLjUuMCJcbiAgaW1wbGVtZW50YXRpb24gImFuZHJvaWR4LmFwcGNvbXBhdDphcHBjb21wYXQ6MS43LjAiXG59XG4nKQpvcGVuKCdhcHAvYXBwL3NyYy9tYWluL0FuZHJvaWRNYW5pZmVzdC54bWwnLCd3Jykud3JpdGUoJzw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9InV0Zi04Ij8+XG48bWFuaWZlc3QgeG1sbnM6YW5kcm9pZD0iaHR0cDovL3NjaGVtYXMuYW5kcm9pZC5jb20vYXBrL3Jlcy9hbmRyb2lkIj5cbiAgPGFwcGxpY2F0aW9uIGFuZHJvaWQ6bGFiZWw9IkdvbGFwaSBab25lIE1hbmFnZXIiIGFuZHJvaWQ6aWNvbj0iQG1pcG1hcC9pY19sYXVuY2hlciIgYW5kcm9pZDp0aGVtZT0iQHN0eWxlL0FwcFRoZW1lIiBhbmRyb2lkOmFsbG93QmFja3VwPSJ0cnVlIj5cbiAgICA8YWN0aXZpdHkgYW5kcm9pZDpuYW1lPSJjb20uZ29vZ2xlLmFuZHJvaWRicm93c2VyaGVscGVyLnRydXN0ZWQuTGF1bmNoZXJBY3Rpdml0eSIgYW5kcm9pZDpleHBvcnRlZD0idHJ1ZSI+XG4gICAgICA8bWV0YS1kYXRhIGFuZHJvaWQ6bmFtZT0iYW5kcm9pZC5zdXBwb3J0LmN1c3RvbXRhYnMudHJ1c3RlZC5ERUZBVUxUX1VSTCIgYW5kcm9pZDp2YWx1ZT0iaHR0cHM6Ly93d3cuZ29sYXBpc2hvcC5vbmxpbmUvP3JvbGU9em9uZS1tYW5hZ2VyIiAvPlxuICAgICAgPGludGVudC1maWx0ZXI+PGFjdGlvbiBhbmRyb2lkOm5hbWU9ImFuZHJvaWQuaW50ZW50LmFjdGlvbi5NQUlOIi8+PGNhdGVnb3J5IGFuZHJvaWQ6bmFtZT0iYW5kcm9pZC5pbnRlbnQuY2F0ZWdvcnkuTEFVTkNIRVIiLz48L2ludGVudC1maWx0ZXI+XG4gICAgICA8aW50ZW50LWZpbHRlciBhbmRyb2lkOmF1dG9WZXJpZnk9InRydWUiPjxhY3Rpb24gYW5kcm9pZDpuYW1lPSJhbmRyb2lkLmludGVudC5hY3Rpb24uVklFVyIvPjxjYXRlZ29yeSBhbmRyb2lkOm5hbWU9ImFuZHJvaWQuaW50ZW50LmNhdGVnb3J5LkRFRkFVTFQiLz48Y2F0ZWdvcnkgYW5kcm9pZDpuYW1lPSJhbmRyb2lkLmludGVudC5jYXRlZ29yeS5CUk9XU0FCTEUiLz48ZGF0YSBhbmRyb2lkOnNjaGVtZT0iaHR0cHMiIGFuZHJvaWQ6aG9zdD0id3d3LmdvbGFwaXNob3Aub25saW5lIi8+PC9pbnRlbnQtZmlsdGVyPlxuICAgIDwvYWN0aXZpdHk+XG4gIDwvYXBwbGljYXRpb24+XG48L21hbmlmZXN0PlxuJykKb3BlbignYXBwL2FwcC9zcmMvbWFpbi9yZXMvdmFsdWVzL3N0eWxlcy54bWwnLCd3Jykud3JpdGUoJzw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9InV0Zi04Ij8+XG48cmVzb3VyY2VzPlxuICA8c3R5bGUgbmFtZT0iQXBwVGhlbWUiIHBhcmVudD0iVGhlbWUuQXBwQ29tcGF0LkxpZ2h0Lk5vQWN0aW9uQmFyIj5cbiAgICA8aXRlbSBuYW1lPSJjb2xvclByaW1hcnkiPiMwQTJENUE8L2l0ZW0+XG4gIDwvc3R5bGU+XG48L3Jlc291cmNlcz5cbicpCnByaW50KCdBbGwgZmlsZXMgY3JlYXRlZCBPSycpCg==" | base64 --decode | python3
 
-          python3 -c "
-          from PIL import Image
-          import os
-          src = Image.open('.github/icons/ic_launcher.png')
-          for sz, dn in [(48,'mdpi'),(72,'hdpi'),(96,'xhdpi'),(144,'xxhdpi'),(192,'xxxhdpi')]:
-              d = 'app/app/src/main/res/mipmap-' + dn
-              os.makedirs(d, exist_ok=True)
-              src.resize((sz,sz), Image.LANCZOS).save(d + '/ic_launcher.png')
-          print('Icons ready')
-          "
-
-          cat > app/settings.gradle << 'EOF'
-          rootProject.name = "GolApiZone"
-          include ':app'
-          EOF
-
-          cat > app/build.gradle << 'EOF'
-          buildscript {
-            repositories { google(); mavenCentral() }
-            dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
-          }
-          allprojects { repositories { google(); mavenCentral() } }
-          EOF
-
-          cat > app/gradle.properties << 'EOF'
-          android.useAndroidX=true
-          android.enableJetifier=true
-          org.gradle.jvmargs=-Xmx2048m
-          EOF
-
-          cat > app/app/build.gradle << 'EOF'
-          plugins { id 'com.android.application' }
-          configurations.all {
-            exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
-            exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
-            resolutionStrategy.eachDependency { d ->
-              if (d.requested.group == 'org.jetbrains.kotlin') d.useVersion '1.9.24'
-            }
-          }
-          android {
-            namespace 'online.golapishop.zone'
-            compileSdk 34
-            defaultConfig {
-              applicationId 'online.golapishop.zone'
-              minSdk 21
-              targetSdk 34
-              versionCode ${{ github.run_number }}
-              versionName '1.${{ github.run_number }}'
-            }
-            signingConfigs {
-              release {
-                storeFile file('/tmp/release.keystore')
-                storePassword System.getenv('KEY_STORE_PASSWORD')?.trim()
-                keyAlias System.getenv('KEY_ALIAS')?.trim()
-                keyPassword System.getenv('KEY_PASSWORD')?.trim()
-              }
-            }
-            buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
-            packagingOptions { exclude 'META-INF/versions/9/previous-compilation-data.bin' }
-          }
-          dependencies {
-            implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
-            implementation 'androidx.appcompat:appcompat:1.7.0'
-          }
-          EOF
-
-          cat > app/app/src/main/AndroidManifest.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <application android:label="Golapi Zone Manager" android:icon="@mipmap/ic_launcher" android:theme="@style/AppTheme" android:allowBackup="true">
-              <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
-                <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://www.golapishop.online/?role=zone-manager" />
-                <intent-filter>
-                  <action android:name="android.intent.action.MAIN"/>
-                  <category android:name="android.intent.category.LAUNCHER"/>
-                </intent-filter>
-                <intent-filter android:autoVerify="true">
-                  <action android:name="android.intent.action.VIEW"/>
-                  <category android:name="android.intent.category.DEFAULT"/>
-                  <category android:name="android.intent.category.BROWSABLE"/>
-                  <data android:scheme="https" android:host="www.golapishop.online"/>
-                </intent-filter>
-              </activity>
-            </application>
-          </manifest>
-          EOF
-
-          cat > app/app/src/main/res/values/styles.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-            <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-              <item name="colorPrimary">#0A2D5A</item>
-            </style>
-          </resources>
-          EOF
-
-      - name: Setup Gradle Wrapper
+      - name: Generate Gradle Wrapper
         run: cd app && gradle wrapper --gradle-version 8.4
 
       - name: Build APK
@@ -142,6 +51,7 @@ jobs:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
         run: cd app && chmod +x gradlew && ./gradlew assembleRelease --stacktrace
 
       - name: Collect APK
@@ -154,16 +64,18 @@ jobs:
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           groups: testers
           file: output.apk
-          releaseNotes: "Build #${{ github.run_number }} — নতুন আপডেট"
+          releaseNotes: "Build #${{ github.run_number }} - নতুন আপডেট"
 
       - uses: actions/upload-artifact@v4
         with:
           name: golapi-zonemanager-v${{ github.run_number }}
           path: output.apk
 
-      - uses: softprops/action-gh-release@v2
+      - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: zonemanager-v${{ github.run_number }}
+          tag_name: zone-v${{ github.run_number }}
           name: "Golapi Golapi Zone Manager v${{ github.run_number }}"
           files: output.apk
         env:
