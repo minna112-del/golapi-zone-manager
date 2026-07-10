@@ -12,15 +12,23 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
       - uses: android-actions/setup-android@v3
+
       - name: Accept Licenses
         run: yes | sdkmanager --licenses || true
+
+      - name: Install Pillow
+        run: pip install Pillow --break-system-packages -q
+
       - name: Decode Keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/release.keystore
+
       - name: Build TWA Project
         run: |
           mkdir -p app/app/src/main/res/mipmap-mdpi
@@ -30,22 +38,22 @@ jobs:
           mkdir -p app/app/src/main/res/mipmap-xxxhdpi
           mkdir -p app/app/src/main/res/values
 
-          # Icon — repo থেকে copy করো এবং resize করো
-          python3 - << 'PYEOF2'
+          python3 -c "
           from PIL import Image
           import os
           src = Image.open('.github/icons/ic_launcher.png')
           for sz, dn in [(48,'mdpi'),(72,'hdpi'),(96,'xhdpi'),(144,'xxhdpi'),(192,'xxxhdpi')]:
-              d = f'app/app/src/main/res/mipmap-{dn}'
+              d = 'app/app/src/main/res/mipmap-' + dn
               os.makedirs(d, exist_ok=True)
-              src.resize((sz,sz), Image.LANCZOS).save(f'{d}/ic_launcher.png')
+              src.resize((sz,sz), Image.LANCZOS).save(d + '/ic_launcher.png')
           print('Icons ready')
-          PYEOF2
+          "
 
           cat > app/settings.gradle << 'EOF'
           rootProject.name = "GolApiZone"
           include ':app'
           EOF
+
           cat > app/build.gradle << 'EOF'
           buildscript {
             repositories { google(); mavenCentral() }
@@ -53,11 +61,13 @@ jobs:
           }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
+
           cat > app/gradle.properties << 'EOF'
           android.useAndroidX=true
           android.enableJetifier=true
           org.gradle.jvmargs=-Xmx2048m
           EOF
+
           cat > app/app/build.gradle << 'EOF'
           plugins { id 'com.android.application' }
           configurations.all {
@@ -93,13 +103,17 @@ jobs:
             implementation 'androidx.appcompat:appcompat:1.7.0'
           }
           EOF
+
           cat > app/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <application android:label="Golapi Zone Manager" android:icon="@mipmap/ic_launcher" android:theme="@style/AppTheme" android:allowBackup="true">
               <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity" android:exported="true">
                 <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL" android:value="https://www.golapishop.online/?role=zone-manager" />
-                <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
                 <intent-filter android:autoVerify="true">
                   <action android:name="android.intent.action.VIEW"/>
                   <category android:name="android.intent.category.DEFAULT"/>
@@ -110,6 +124,7 @@ jobs:
             </application>
           </manifest>
           EOF
+
           cat > app/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -118,9 +133,6 @@ jobs:
             </style>
           </resources>
           EOF
-
-      - name: Install Pillow
-        run: pip install Pillow --break-system-packages -q
 
       - name: Setup Gradle Wrapper
         run: cd app && gradle wrapper --gradle-version 8.4
